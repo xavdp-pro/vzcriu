@@ -1,0 +1,14 @@
+#!/bin/sh
+# Installed by podmesh-vzcriu-helpers as /usr/bin/podmesh-vzcriu-lab.
+# Forces controller mode "packaged" by default (see lab.py's
+# resolved_mode/DEFAULT_NODE_CMD_BY_MODE) so this command talks to
+# podmesh-vzcriu-node on remote node hosts out of the box, with no
+# environment variables required from the user. PODMESH_VZCRIU_RUNTIME and
+# PODMESH_VZCRIU_NODE_CMD remain available as explicit overrides because this
+# only sets PODMESH_VZCRIU_RUNTIME when it is unset.
+: "${PODMESH_VZCRIU_RUNTIME:=packaged}"
+export PODMESH_VZCRIU_RUNTIME
+# PODMESH_VZCRIU_LAB_PY_OVERRIDE is an internal test hook only; not part of
+# the documented interface.
+target="${PODMESH_VZCRIU_LAB_PY_OVERRIDE:-/opt/podmesh-vzcriu-kit/lib/lab.py}"
+exec python3 "$target" "$@"

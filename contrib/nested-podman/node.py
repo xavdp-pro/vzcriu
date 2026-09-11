@@ -13,7 +13,46 @@ import time
 BASE = Path('/var/lib/vzcriu-kit')
 P = ['podman', '--root=/var/lib/containers/vzkit', '--runroot=/run/containers/vzkit', '--storage-driver=vfs']
 INNER = ['podman', '--storage-driver=vfs', '--cgroup-manager=cgroupfs', '--events-backend=file']
-ENV = dict(os.environ, PATH='/opt/vzcriu-kit/bin:' + os.environ.get('PATH', '/usr/sbin:/usr/bin:/sbin:/bin'), GLIBC_TUNABLES='glibc.pthread.rseq=0')
+
+# Runtime location. Two layouts are supported:
+#  - "manual": the source-tree / hand-installed kit at /opt/vzcriu-kit (original behavior).
+#  - "packaged": the podmesh-vzcriu-helpers .deb, which depends on the separately
+#    packaged podmesh-vzcriu runtime (/usr/bin/podmesh-vzcriu, /usr/lib/podmesh-vzcriu/criu)
+#    and forwards to it through a private-path "criu"-named shim so Podman's own
+#    PATH lookup keeps working without touching the distribution criu.
+# Each field can be overridden independently (mainly for tests, with a mocked
+# binary); PODMESH_VZCRIU_RUNTIME picks a layout explicitly ("manual"/"packaged").
+# With no override, the manual kit wins if present (preserves existing behavior),
+# otherwise the packaged runtime is used if installed.
+
+
+def _candidate(env_prefix, wrapper, real, bindir):
+    return {
+        'wrapper': Path(os.environ.get(env_prefix + '_WRAPPER', wrapper)),
+        'real': Path(os.environ.get(env_prefix + '_REAL', real)),
+        'bindir': os.environ.get(env_prefix + '_BINDIR', bindir),
+    }
+
+
+def _detect_runtime():
+    manual = _candidate('PODMESH_VZCRIU_MANUAL', '/opt/vzcriu-kit/bin/criu', '/opt/vzcriu-kit/criu.real', '/opt/vzcriu-kit/bin')
+    packaged = _candidate('PODMESH_VZCRIU_PACKAGED', '/usr/bin/podmesh-vzcriu', '/usr/lib/podmesh-vzcriu/criu', '/opt/podmesh-vzcriu-kit/bin')
+    mode = os.environ.get('PODMESH_VZCRIU_RUNTIME', '').strip().lower()
+    if mode == 'manual':
+        return manual
+    if mode == 'packaged':
+        return packaged
+    if mode:
+        raise RuntimeError(f'Unknown PODMESH_VZCRIU_RUNTIME {mode!r}; expected "manual" or "packaged"')
+    if manual['real'].is_file():
+        return manual
+    if packaged['real'].is_file():
+        return packaged
+    return manual  # unchanged default: error messages still point at the manual kit
+
+
+RUNTIME = _detect_runtime()
+ENV = dict(os.environ, PATH=str(RUNTIME['bindir']) + ':' + os.environ.get('PATH', '/usr/sbin:/usr/bin:/sbin:/bin'), GLIBC_TUNABLES='glibc.pthread.rseq=0')
 
 def run(args, data=None):
     r = subprocess.run(args, input=data, text=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, env=ENV, timeout=120)
@@ -128,18 +167,18 @@ def restore(name, job):
 def identity():
     return {'machine_id': Path('/etc/machine-id').read_text().strip(),
             'compatibility': {'kernel': os.uname().release, 'architecture': os.uname().machine,
-            'criu_sha256': hashlib.sha256(Path('/opt/vzcriu-kit/criu.real').read_bytes()).hexdigest(),
+            'criu_sha256': hashlib.sha256(RUNTIME['real'].read_bytes()).hexdigest(),
             'podman': run(['podman', '--version']).strip(),
             'crun': run(['crun', '--version']).splitlines()[0],
             'image': json.loads(pod('image', 'inspect', 'localhost/migration-lab:extended'))[0]['Id']}}
 
 def preflight(name):
-    if not BASE.is_dir() or not Path('/opt/vzcriu-kit/criu.real').is_file():
+    if not BASE.is_dir() or not RUNTIME['real'].is_file():
         raise RuntimeError('Target not initialized')
     r = subprocess.run(P + ['container', 'exists', name], env=ENV)
     if r.returncode != 1:
         raise RuntimeError('Destination container already exists or store unavailable')
-    run(['/opt/vzcriu-kit/bin/criu', '--version'])
+    run([str(RUNTIME['wrapper']), '--version'])
     return dict(identity(), ready=True)
 
 def retire(name):

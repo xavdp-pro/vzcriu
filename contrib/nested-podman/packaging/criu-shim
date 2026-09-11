@@ -1,0 +1,7 @@
+#!/bin/sh
+# Installed by podmesh-vzcriu-helpers-node as /opt/podmesh-vzcriu-kit/bin/criu.
+# A private-path shim, NOT installed under /usr/bin or /usr/sbin, so Podman's
+# own PATH lookup for a binary literally named "criu" is satisfied without
+# ever shadowing the distribution criu package. Forwards to the separately
+# packaged podmesh-vzcriu runtime.
+exec /usr/bin/podmesh-vzcriu "$@"

@@ -1,0 +1,14 @@
+#!/bin/sh
+# Installed by podmesh-vzcriu-helpers-node as /usr/bin/podmesh-vzcriu-node.
+# Forces the packaged runtime by default so this command works correctly on
+# a clean target with only the Debian packages installed, with no
+# environment variables required from the user. PODMESH_VZCRIU_RUNTIME
+# remains available as an explicit override (e.g. to force "manual" against
+# a coexisting /opt/vzcriu-kit install) because this only sets it when unset.
+: "${PODMESH_VZCRIU_RUNTIME:=packaged}"
+export PODMESH_VZCRIU_RUNTIME
+# PODMESH_VZCRIU_NODE_PY_OVERRIDE is an internal test hook only (used by
+# tests/test_helpers_dispatch.py to point this wrapper at a fake node.py
+# without installing anything); it is not part of the documented interface.
+target="${PODMESH_VZCRIU_NODE_PY_OVERRIDE:-/opt/podmesh-vzcriu-kit/lib/node.py}"
+exec python3 "$target" "$@"

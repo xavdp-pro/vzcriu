@@ -33,3 +33,26 @@ Overall: experimental advance with known limitations. No proof for networked uni
 `podmesh-vzcriu 3.15.5.3+podmesh1~experimental1` was built and published through the signed experimental APT repository. Installation on all three Debian 13 amd64 lab hosts succeeded. `check-runtime-package.sh` verified the expected binary hash, runnable version command, resolved shared libraries and absence of ownership of the system CRIU executable paths. This is package-delivery evidence, not an additional migration run.
 
 Three-pass review: governance preserves an explicitly named, optional runtime; operator documentation distinguishes package installation from complete migration setup; runtime checks confirm identical tested binary bytes and dependencies. No independent counter-review was available for this packaging-only change. Remaining work includes clean-host dependency testing and the complete helper/API migration chain.
+
+## Packaged migration helpers (2026-09-11)
+
+`podmesh-vzcriu-helpers` and `podmesh-vzcriu-helpers-node`, version
+`1.0.0+podmesh1~experimental1`, separate controller scripts from node dependencies.
+Both are published in the signed experimental APT repository. Installed wrappers
+select the packaged runtime explicitly; the manual kit remains available.
+Remote replication snippets carry both the import path and runtime mode through
+arguments before importing the node module, including across a sudo boundary.
+
+Thirty offline tests passed, including a regression that reproduces the former
+manual-runtime selection bug with both layouts present. These tests were rerun
+by Codex after Claude Code's implementation. Package build and shell syntax
+checks passed. Shellcheck and lintian were unavailable, so neither is claimed.
+Real APT installations and read-only installed-path/runtime checks passed
+on all three Debian 13 amd64 lab hosts.
+This is package qualification, not a new end-to-end migration result.
+
+Review passes: requirements and dependency scope; source and built-artifact
+inspection with independent Codex counter-review of Claude Code's changes;
+then installation evidence. Two dispatch defects found during review were fixed
+before publication. The helpers still target only the documented isolated nested
+counter workload; they do not constitute the PodMesh migration API or generic HA.

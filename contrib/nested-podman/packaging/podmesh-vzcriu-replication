@@ -1,0 +1,11 @@
+#!/bin/sh
+# Installed by podmesh-vzcriu-helpers as /usr/bin/podmesh-vzcriu-replication.
+# Forces controller mode "packaged" by default, same rationale as
+# podmesh-vzcriu-lab: no environment variables required from the user for
+# the installed command to work correctly, while remaining overridable.
+: "${PODMESH_VZCRIU_RUNTIME:=packaged}"
+export PODMESH_VZCRIU_RUNTIME
+# PODMESH_VZCRIU_REPLICATION_PY_OVERRIDE is an internal test hook only; not
+# part of the documented interface.
+target="${PODMESH_VZCRIU_REPLICATION_PY_OVERRIDE:-/opt/podmesh-vzcriu-kit/lib/replication.py}"
+exec python3 "$target" "$@"

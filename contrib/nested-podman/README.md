@@ -143,3 +143,20 @@ store is not created implicitly by migration; run init first.
 `build-runtime-deb.sh` builds `podmesh-vzcriu` on Debian 13 amd64 from this source tree. It installs `/usr/lib/podmesh-vzcriu/criu` and the explicitly named `/usr/bin/podmesh-vzcriu` wrapper, without replacing the distribution `criu`. The wrapper applies the same experimental rseq workaround described above. The package contains the upstream license and declares its shared-library dependencies.
 
 This runtime package alone does not install the complete migration controller, prepare images or enable migration in the PodMesh service. Existing `/opt/vzcriu-kit` installations are not rewritten. The first packaged binary was checked to match the previously tested runtime SHA-256 `4ecb663e7e3b019cdfa534c0d4cce4134938f87ae3b45cac35a7481c0a947cd4`.
+
+## Experimental Debian helper/controller packages
+
+`build-helpers-deb.sh` builds two packages, split along where Podman and crun are actually required:
+
+- `podmesh-vzcriu-helpers` (controller side): `lab.py` and `replication.py`, exposed as `podmesh-vzcriu-lab` and `podmesh-vzcriu-replication`. Only needs `python3` and `openssh-client` — it drives node hosts over SSH and never calls Podman/crun itself.
+- `podmesh-vzcriu-helpers-node` (node side): `node.py`, exposed as `podmesh-vzcriu-node`, plus a private-path `criu` shim. Hard-depends on `podmesh-vzcriu (>= 3.15.5.3+podmesh1~experimental1)`, `python3`, `podman` and `crun`, all of which `node.py` genuinely invokes at runtime — not merely `Recommends`.
+
+Both install under `/opt/podmesh-vzcriu-kit` and never write into the manual `/opt/vzcriu-kit` layout. A single host acting as both controller and node installs both packages.
+
+On a node host, `node.py` (`podmesh-vzcriu-node`) autodetects which runtime to call: the manual `/opt/vzcriu-kit` kit if present (unchanged default, including for anyone still running it straight from this source tree), otherwise the packaged `podmesh-vzcriu` runtime; force one explicitly with `PODMESH_VZCRIU_RUNTIME=manual|packaged`.
+
+On the controller, `lab.py`/`replication.py` resolve a *mode* the same way (`PODMESH_VZCRIU_RUNTIME=manual|packaged`, default `manual`) that decides both which remote command to run (`PODMESH_VZCRIU_NODE_CMD`, default `sudo python3 /opt/vzcriu-kit/node.py` for manual, `sudo podmesh-vzcriu-node` for packaged) and, for `replication.py`'s remote snippets, two things baked directly into the remote command line rather than an environment variable (since `sudo` on the target typically resets the environment): which single directory to import `node.py` from, *and* which runtime mode that remote `node.py` itself then selects (forced via `os.environ['PODMESH_VZCRIU_RUNTIME']` set inside the remote process, from that same argv value, before `import node`). Both are required — getting only the import directory right isn't enough, since `node.py` has its own independent `_detect_runtime()` that must also be told which mode to use, or it falls back to autodetection (manual-preferring) regardless of what the controller resolved. This keeps the choice deterministic even on a host where both layouts happen to exist. The installed `podmesh-vzcriu-lab`/`podmesh-vzcriu-replication` commands set `PODMESH_VZCRIU_RUNTIME=packaged` themselves whenever the caller hasn't already set it, so a clean target with only the Debian packages installed works correctly with **no environment variables required**; running the scripts directly from a checkout still defaults to `manual`, unchanged.
+
+See `README.Debian-helpers.md` for full scope, limitations and image-preparation steps, and `tests/test_helpers_dispatch.py` for the offline dispatch checks (`build-helpers-deb.sh --check`).
+
+These helper packages are, like the runtime package above, workload-specific to the disposable nested-counter lab described in this file — not a generic migration or HA solution.

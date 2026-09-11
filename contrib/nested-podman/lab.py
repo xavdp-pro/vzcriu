@@ -3,6 +3,7 @@
 import argparse
 import hashlib
 import json
+import os
 from pathlib import Path
 import re
 import shlex
@@ -12,15 +13,69 @@ import uuid
 
 HERE = Path(__file__).resolve().parent
 
+# Controller-side mode: which remote node-host layout lab.py/replication.py
+# should talk to. Two values are meaningful:
+#  - "manual" (default when nothing is set): unchanged original behavior,
+#    talks to a hand-installed/source-tree kit at /opt/vzcriu-kit on the node.
+#  - "packaged": talks to a node host with podmesh-vzcriu-helpers-node
+#    installed (command podmesh-vzcriu-node, scripts under
+#    /opt/podmesh-vzcriu-kit/lib).
+# The installed podmesh-vzcriu-lab/podmesh-vzcriu-replication wrapper
+# commands set PODMESH_VZCRIU_RUNTIME=packaged by default (only if the caller
+# hasn't already set it) before dispatching here, so a clean packaged install
+# works correctly with no environment variables required from the user.
+# Running lab.py/replication.py directly from a checkout leaves this unset
+# and keeps the original manual default. PODMESH_VZCRIU_NODE_CMD remains an
+# explicit override of the resulting remote command, independent of mode.
+DEFAULT_NODE_CMD_BY_MODE = {
+    'manual': 'sudo python3 /opt/vzcriu-kit/node.py',
+    'packaged': 'sudo podmesh-vzcriu-node',
+}
+# Where replication.py's remote inline snippets should import node.py from,
+# for each mode. Kept alongside DEFAULT_NODE_CMD_BY_MODE since both are
+# derived from the same resolved mode. Each has a matching env var override
+# (mainly for tests: it lets a test point "manual"/"packaged" at a temp
+# directory instead of requiring real content at /opt/vzcriu-kit or
+# /opt/podmesh-vzcriu-kit/lib).
+KIT_LIB_DIR_BY_MODE = {
+    'manual': '/opt/vzcriu-kit',
+    'packaged': '/opt/podmesh-vzcriu-kit/lib',
+}
+KIT_LIB_DIR_ENV_BY_MODE = {
+    'manual': 'PODMESH_VZCRIU_MANUAL_KIT_LIB',
+    'packaged': 'PODMESH_VZCRIU_PACKAGED_KIT_LIB',
+}
+
+def resolved_mode():
+    mode = os.environ.get('PODMESH_VZCRIU_RUNTIME', '').strip().lower()
+    if not mode:
+        return 'manual'
+    if mode not in DEFAULT_NODE_CMD_BY_MODE:
+        raise ValueError(f'Unknown PODMESH_VZCRIU_RUNTIME {mode!r}; expected "manual" or "packaged"')
+    return mode
+
+def kit_lib_dir(mode=None):
+    mode = mode or resolved_mode()
+    return os.environ.get(KIT_LIB_DIR_ENV_BY_MODE[mode], KIT_LIB_DIR_BY_MODE[mode])
+
 def ssh(host, argv, data=None):
     if not re.fullmatch(r'[A-Za-z0-9_.@-]+', host) or host.startswith('-'):
         raise ValueError('Invalid SSH host')
     return subprocess.run(['ssh', '-oBatchMode=yes', '-oConnectTimeout=10', host, shlex.join(argv)], input=data, stdout=subprocess.PIPE, stderr=subprocess.PIPE, check=True, timeout=180).stdout
 
-def node(host, action, name, job=''):
-    args = ['sudo', 'python3', '/opt/vzcriu-kit/node.py', action, '--name', name]
+def node_command():
+    override = os.environ.get('PODMESH_VZCRIU_NODE_CMD')
+    if override:
+        return shlex.split(override)
+    return shlex.split(DEFAULT_NODE_CMD_BY_MODE[resolved_mode()])
+
+def remote_node_argv(action, name, job=''):
+    args = node_command() + [action, '--name', name]
     if job: args += ['--job', job]
-    return json.loads(ssh(host, args))
+    return args
+
+def node(host, action, name, job=''):
+    return json.loads(ssh(host, remote_node_argv(action, name, job)))
 
 def install(host, binary):
     ssh(host, ['sudo', 'mkdir', '-p', '/opt/vzcriu-kit/bin'])
