@@ -1,5 +1,21 @@
 # Experimental nested Podman checkpoint/restore laboratory
 
+## Attribution
+
+This experimental adaptation and automation kit were developed by **Xavier de
+Poorter (xavdp-pro), in collaboration with OpenAI Codex (GPT-6)**. Xavier defined
+the objectives and directed the experiments; Codex implemented the adaptations,
+automation and documented laboratory checks under his direction.
+
+The original CRIU and OpenVZ/Virtuozzo vzcriu code, including the existing nested
+PID namespace support, belongs to its upstream contributors. Our contribution is
+the Debian 13 compatibility work, the nested Podman demonstration workflow,
+runtime reconciliation and the published test procedure described here. Original
+copyright notices and licensing remain unchanged. This fork does not imply
+upstream review, endorsement or acceptance of our experimental changes.
+
+## Overview
+
 This kit investigates migration of an outer Podman container containing a running
 inner Podman container. It is **not production-qualified**. It uses a patched
 OpenVZ/vzcriu (upstream base `6fe1b0e`), not current upstream CRIU.
