@@ -19,6 +19,8 @@ enum fsconfig_command {
 };
 #endif
 
+#ifndef CR_NOGLIBC
+#include <unistd.h>
 static inline int sys_fsopen(const char *fsname, unsigned int flags)
 {
 	return syscall(__NR_fsopen, fsname, flags);
@@ -31,5 +33,7 @@ static inline int sys_fsmount(int fd, unsigned int flags, unsigned int attr_flag
 {
 	return syscall(__NR_fsmount, fd, flags, attr_flags);
 }
+
+#endif /* !CR_NOGLIBC */
 
 #endif

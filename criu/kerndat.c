@@ -925,16 +925,17 @@ int kerndat_has_pid_for_children_ns(void)
 
 int kerndat_has_mount_set_group(void)
 {
-	char tmpdir[] = "/tmp/.criu.mount_set_group.XXXXXX";
-	int ret = -1;
+	char tmpdir[] = "/tmp/.criu.move_mount_set_group.XXXXXX";
+	char subdir[64];
+	int exit_code = -1;
 
 	if (mkdtemp(tmpdir) == NULL) {
 		pr_perror("Fail to make dir %s", tmpdir);
 		return -1;
 	}
 
-	if (mount(tmpdir, tmpdir, NULL, MS_BIND, NULL)) {
-		pr_perror("Fail to make bind-mount %s", tmpdir);
+	if (mount("criu.move_mount_set_group", tmpdir, "tmpfs", 0, NULL)) {
+		pr_perror("Fail to mount tmfps to %s", tmpdir);
 		rmdir(tmpdir);
 		return -1;
 	}
@@ -944,24 +945,47 @@ int kerndat_has_mount_set_group(void)
 		goto out;
 	}
 
-	if (mount("/tmp", tmpdir, NULL, MS_SET_GROUP, NULL) < 0) {
-		if (errno == EINVAL) {
-			pr_debug("No mount(MS_SET_GROUP) kernel feature\n");
+	if (snprintf(subdir, sizeof(subdir), "%s/subdir", tmpdir) >= sizeof(subdir)) {
+		pr_err("Fail to snprintf subdir\n");
+		goto out;
+	}
+
+	if (mkdir(subdir, 0700)) {
+		pr_perror("Fail to make dir %s", subdir);
+		goto out;
+	}
+
+	if (mount(subdir, subdir, NULL, MS_BIND, NULL)) {
+		pr_perror("Fail to make bind-mount %s", subdir);
+		goto out;
+	}
+
+	if (mount(NULL, tmpdir, NULL, MS_SHARED, NULL)) {
+		pr_perror("Fail to make %s private", tmpdir);
+		goto out;
+	}
+
+	if (lab_set_mount_group(tmpdir, subdir)) {
+		if (errno == EINVAL || errno == ENOSYS) {
+			pr_debug("No MOVE_MOUNT_SET_GROUP kernel feature\n");
 			kdat.has_mount_set_group = false;
-			ret = 0;
+			exit_code = 0;
 			goto out;
 		}
-		pr_perror("Fail to mount(MS_SET_GROUP)");
+		pr_perror("Fail to MOVE_MOUNT_SET_GROUP");
 		goto out;
 	}
 
 	kdat.has_mount_set_group = true;
-	ret = 0;
+	exit_code = 0;
 out:
-	umount2(tmpdir, MNT_DETACH);
-	rmdir(tmpdir);
-	return ret;
+	if (umount2(tmpdir, MNT_DETACH))
+		pr_warn("Fail to umount2 %s: %s\n", tmpdir, strerror(errno));
+	if (rmdir(tmpdir))
+		pr_warn("Fail to rmdir %s: %s\n", tmpdir, strerror(errno));
+	return exit_code;
 }
+
 
 int kerndat_has_beancounters(void)
 {
@@ -1015,6 +1039,12 @@ int kerndat_cgroup_kmem_limit(void)
 	char kmem_limit_path[MAX_KMEM_LIMIT_PATH];
 	char *zero = "0";
 	int fd, exit_code = -1;
+
+	/* The unified hierarchy has no cgroup-v1 kernel-memory limit. */
+	if (access("/sys/fs/cgroup/cgroup.controllers", F_OK) == 0) {
+		kdat.has_cgroup_kmem_limit = false;
+		return 0;
+	}
 
 	if (mkdtemp(tmpdir) == NULL) {
 		pr_perror("Fail to make dir %s", tmpdir);

@@ -282,27 +282,17 @@ static int bpfmap_open(struct file_desc *d, int *new_fd)
 {
 	struct bpfmap_file_info *info;
 	BpfmapFileEntry *bpfe;
-	struct bpf_create_map_attr xattr;
+	struct bpf_map_create_opts xattr = { .sz = sizeof(struct bpf_map_create_opts) };
 	int bpfmap_fd;
 
 	info = container_of(d, struct bpfmap_file_info, d);
 	bpfe = info->bpfe;
 
-	xattr.name = xstrdup(bpfe->map_name);
-	xattr.map_type = bpfe->map_type;
 	xattr.map_flags = bpfe->map_flags;
-	xattr.key_size = bpfe->key_size;
-	xattr.value_size = bpfe->value_size;
-	xattr.max_entries = bpfe->max_entries;
-	xattr.numa_node = 0;
-	xattr.btf_fd = 0;
-	xattr.btf_key_type_id = 0;
-	xattr.btf_value_type_id = 0;
 	xattr.map_ifindex = bpfe->ifindex;
-	xattr.inner_map_fd = 0;
-
 	pr_info_bpfmap("Creating and opening ", bpfe);
-	bpfmap_fd = bpf_create_map_xattr(&xattr);
+	bpfmap_fd = bpf_map_create(bpfe->map_type, bpfe->map_name,
+		bpfe->key_size, bpfe->value_size, bpfe->max_entries, &xattr);
 	if (bpfmap_fd < 0) {
 		pr_perror("Can't create bpfmap %#08x", bpfe->id);
 		return -1;

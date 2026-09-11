@@ -6,7 +6,24 @@
 #include "common/list.h"
 #include "mount.h"
 
-#define MS_SET_GROUP (1<<26)
+
+#include <sys/syscall.h>
+#include <fcntl.h>
+#include <unistd.h>
+#include <errno.h>
+
+/* Use the upstream Linux mount-group operation on modern kernels. */
+static inline int lab_set_mount_group(const char *source, const char *target)
+{
+ int a = open(source, O_PATH | O_CLOEXEC), b, ret, saved;
+ if (a < 0) return -1;
+ b = open(target, O_PATH | O_CLOEXEC);
+ if (b < 0) { saved = errno; close(a); errno = saved; return -1; }
+ ret = syscall(SYS_move_mount, a, "", b, "", 0x100 | 0x4 | 0x40);
+ saved = errno; close(a); close(b); errno = saved;
+ return ret;
+}
+
 
 struct sharing_group {
 	/* This pair identifies the group */

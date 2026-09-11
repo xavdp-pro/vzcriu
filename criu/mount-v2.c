@@ -939,7 +939,7 @@ static int restore_one_sharing_group(struct sharing_group *sg)
 		}
 
 		/* Copy shared_id of the source */
-		if (mount(source, first_path, NULL, MS_SET_GROUP, NULL)) {
+		if (lab_set_mount_group(source, first_path)) {
 			pr_perror("Failed to copy sharing from %s to %d",
 				  source, first->mnt_id);
 			close(first_fd);
@@ -989,7 +989,7 @@ static int restore_one_sharing_group(struct sharing_group *sg)
 
 		pr_debug("Copy sharing group from %d to %d\n",
 			 first->mnt_id, other->mnt_id);
-		if (mount(first_path, mntfd_path, NULL, MS_SET_GROUP, NULL)) {
+		if (lab_set_mount_group(first_path, mntfd_path)) {
 			pr_perror("Failed to copy sharing from %d to %d",
 				  first->mnt_id, other->mnt_id);
 			close(mntfd);

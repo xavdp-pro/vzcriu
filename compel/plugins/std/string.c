@@ -161,7 +161,7 @@ static unsigned int __conv_val(unsigned char c)
 	if (__isdigit(c))
 		return c - '0';
 	else if (__isalpha(c))
-		return &conv_tab[__tolower(c)] - conv_tab;
+		return __tolower(c) - 'a' + 10;
 	return -1u;
 }
 

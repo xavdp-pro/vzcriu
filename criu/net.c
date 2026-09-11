@@ -3144,6 +3144,10 @@ static int ns_run_nftables_tool(void *args)
 {
 	struct nftables_arg *nfta = (struct nftables_arg *)args;
 
+	/* Modern Debian provides nft directly, without the Virtuozzo chroot. */
+	if (access(NFT_CHROOT_PATH, F_OK) != 0 && errno == ENOENT)
+		return __run_nftables_tool(nfta->def_cmd, nfta->fdin, nfta->fdout);
+
 	pr_info("Using newer nft from chroot %s\n", NFT_CHROOT_PATH);
 
 	if (unshare(CLONE_NEWNS)) {

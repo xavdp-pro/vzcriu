@@ -194,7 +194,7 @@ static enum freezer_state get_self_freezer_state(const char *dir)
 	int ret;
 	int fd;
 
-	ret = snprintf(path, sizeof(path), "%s/%s", dir, "freezer.self_freezing");
+	ret = snprintf(path, sizeof(path), "%s/%s", dir, cgroup_v2 ? "cgroup.freeze" : "freezer.self_freezing");
 	if (ret >= sizeof(path)) {
 		pr_perror("Directory path [%s] is too long", dir);
 		goto err;

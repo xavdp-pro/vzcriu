@@ -194,7 +194,8 @@ static int lsm_set_label(char *label, char *type, int procfd)
 
 	pr_info("restoring lsm profile (%s) %s\n", type, label);
 
-	std_sprintf(path, "self/task/%ld/attr/%s", sys_gettid(), type);
+	/* Resolve the calling thread in the proc mount PID namespace. */
+	std_sprintf(path, "thread-self/attr/%s", type);
 
 	lsmfd = sys_openat(procfd, path, O_WRONLY, 0);
 	if (lsmfd < 0) {
@@ -658,7 +659,9 @@ long __export_restore_thread(struct thread_restore_args *args)
 
 	pr_info("%ld: Restored\n", sys_gettid());
 
+	pr_info("LAB before restore barrier\n");
 	restore_finish_stage(task_entries_local, CR_STATE_RESTORE);
+	pr_info("LAB after restore barrier\n");
 
 	if (restore_signals(args->siginfo, args->siginfo_n, false))
 		goto core_restore_end;
@@ -1955,10 +1958,14 @@ long __export_restore_task(struct task_restore_args *args)
 
 	pr_info("%ld: Restored\n", sys_getpid());
 
+	pr_info("LAB before restore barrier\n");
 	restore_finish_stage(task_entries_local, CR_STATE_RESTORE);
+	pr_info("LAB after restore barrier\n");
 
+	pr_info("LAB before helper wait\n");
 	if (wait_helpers(args) < 0)
 		goto core_restore_end;
+	pr_info("LAB before zombie wait\n");
 	if (wait_zombies(args) < 0)
 		goto core_restore_end;
 

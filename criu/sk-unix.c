@@ -583,13 +583,36 @@ static int unix_resolve_name(int lfd, uint32_t id, struct unix_sk_desc *d,
 
 	snprintf(tmp, sizeof(tmp), "self/fd/%d", fd);
 	ret = readlinkat(proc_fd, tmp, path, PATH_MAX);
-	if (ret < 0 && ret >= PATH_MAX) {
+	if (ret < 0 || ret >= PATH_MAX) {
 		pr_perror("Unable to readlink %s", tmp);
 		goto out;
 	}
 	path[ret] = 0;
 
 	d->deleted = strip_deleted(path, ret);
+
+	/* Proc-fd aliases can be closed after bind. Use the resolved location.
+	 * Experimental: getsockname exposes the normalized relative name.
+	 */
+	if (!strncmp(name, "/proc/self/fd/", 14)) {
+		char *base = strrchr(path, '/');
+		char *normalized;
+		if (!base || !base[1]) {
+			pr_err("Cannot normalize proc-fd socket %s\n", name);
+			ret = -EINVAL;
+			goto out;
+		}
+		normalized = xstrdup(base + 1);
+		if (!normalized) {
+			ret = -ENOMEM;
+			goto out;
+		}
+		name = normalized;
+		d->name = normalized;
+		d->namelen = strlen(normalized) + 1;
+		ue->name.data = (void *)normalized;
+		ue->name.len = d->namelen;
+	}
 
 	if (name[0] != '/') {
 		ret = cut_path_ending(path, name);
