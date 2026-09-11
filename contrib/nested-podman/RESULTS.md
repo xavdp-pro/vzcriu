@@ -27,3 +27,9 @@ K1: binary compiled and matching installations verified. Package installation re
 3. Runtime: independent code counter-view identified stale-log proof, late preflight and first-log race; addressed before migration tests. Single-controller operation only; distributed fencing, automatic rollback and arbitrary workload compatibility remain open.
 
 Overall: experimental advance with known limitations. No proof for networked universes, arbitrary rseq users, overlay storage, exact socket getsockname preservation, or production workloads. Raw memory archives are retained privately, not published.
+
+## Debian runtime packaging (2026-09-11)
+
+`podmesh-vzcriu 3.15.5.3+podmesh1~experimental1` was built and published through the signed experimental APT repository. Installation on all three Debian 13 amd64 lab hosts succeeded. `check-runtime-package.sh` verified the expected binary hash, runnable version command, resolved shared libraries and absence of ownership of the system CRIU executable paths. This is package-delivery evidence, not an additional migration run.
+
+Three-pass review: governance preserves an explicitly named, optional runtime; operator documentation distinguishes package installation from complete migration setup; runtime checks confirm identical tested binary bytes and dependencies. No independent counter-review was available for this packaging-only change. Remaining work includes clean-host dependency testing and the complete helper/API migration chain.

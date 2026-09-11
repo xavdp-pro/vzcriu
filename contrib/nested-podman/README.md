@@ -137,3 +137,9 @@ implemented. Destination preflight verifies distinct machine IDs, matching
 kernel, architecture, CRIU hash, runtime versions and outer image ID. CPU feature
 compatibility and available disk/memory remain operator prerequisites. An empty
 store is not created implicitly by migration; run init first.
+
+## Experimental Debian runtime package
+
+`build-runtime-deb.sh` builds `podmesh-vzcriu` on Debian 13 amd64 from this source tree. It installs `/usr/lib/podmesh-vzcriu/criu` and the explicitly named `/usr/bin/podmesh-vzcriu` wrapper, without replacing the distribution `criu`. The wrapper applies the same experimental rseq workaround described above. The package contains the upstream license and declares its shared-library dependencies.
+
+This runtime package alone does not install the complete migration controller, prepare images or enable migration in the PodMesh service. Existing `/opt/vzcriu-kit` installations are not rewritten. The first packaged binary was checked to match the previously tested runtime SHA-256 `4ecb663e7e3b019cdfa534c0d4cce4134938f87ae3b45cac35a7481c0a947cd4`.
